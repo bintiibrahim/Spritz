@@ -10,7 +10,6 @@ namespace ToolWrapperLayer
     public class HISAT2Wrapper :
         IInstallable
     {
-        #region Installation Methods
 
         /// <summary>
         /// Writes an installation script for HISAT2.
@@ -43,61 +42,36 @@ namespace ToolWrapperLayer
             return null;
         }
 
-        #endregion Installation Methods
-        #region Alignment Methods
-
         public static bool IndexExists(string genomeFasta)
         {
             return File.Exists(Path.Combine(Path.GetDirectoryName(genomeFasta), Path.GetFileNameWithoutExtension(genomeFasta) + ".1.ht2"));
         }
 
-        public static void GenerateIndex(string spritzDirectory, string analysisDirectory, string genomeFasta, out string IndexPrefix)
+        public static void GenerateIndex(string spritzDirectory, string analysisDirectory, string genomeFasta, out string indexPrefix)
         {
-            IndexPrefix = Path.Combine(Path.GetDirectoryName(genomeFasta), Path.GetFileNameWithoutExtension(genomeFasta));
-            if (IndexExists(genomeFasta))
-            {
-                return;
-            }
+            indexPrefix = Path.Combine(Path.GetDirectoryName(genomeFasta), Path.GetFileNameWithoutExtension(genomeFasta));
+            if (IndexExists(genomeFasta)) { return; }
+
             WrapperUtility.GenerateAndRunScript(WrapperUtility.GetAnalysisScriptPath(analysisDirectory,"Hisat2Build.bash"), new List<string>
             {
                 WrapperUtility.ChangeToToolsDirectoryCommand(spritzDirectory),
-                "hisat2-2.1.0/hisat2-build" + 
-                    " " + WrapperUtility.ConvertWindowsPath(genomeFasta) +
-                    " " + WrapperUtility.ConvertWindowsPath(IndexPrefix)
+                $"hisat2-2.1.0/hisat2-build {WrapperUtility.ConvertWindowsPath(genomeFasta)} {WrapperUtility.ConvertWindowsPath(indexPrefix)}"
             }).WaitForExit();
         }
 
-        public static void Align(string spritzDirectory, string analysisDirectory, string IndexPrefix, string[] fastqPaths, out string outputDirectory)
+        public static void Align(string spritzDirectory, string analysisDirectory, int threads, string indexPrefix, string[] fastqPaths, out string alignedBamOutput, out string logOutput)
         {
-            if (fastqPaths.Length == 1)
-            {
-                outputDirectory = "Hisat2OutUnpaired.sam";
-                WrapperUtility.GenerateAndRunScript(WrapperUtility.GetAnalysisScriptPath(analysisDirectory, "Hisat2Align.bash"), new List<string>
-                {
-                WrapperUtility.ChangeToToolsDirectoryCommand(spritzDirectory),
-                "hisat2-2.1.0/hisat2 -q -x" +
-                " " + WrapperUtility.ConvertWindowsPath(IndexPrefix) +
-                " -U " + string.Join(",", fastqPaths.Select(x => WrapperUtility.ConvertWindowsPath(x))) +
-                " -S " + outputDirectory,
+            string readsArgument = fastqPaths.Length == 1 ?
+                $" -U {WrapperUtility.ConvertWindowsPath(fastqPaths[0])}" :
+                $" -1 {string.Join(",", WrapperUtility.ConvertWindowsPath(fastqPaths[0]))} -2 {string.Join(",", WrapperUtility.ConvertWindowsPath(fastqPaths[1]))}";
+            alignedBamOutput = WrapperUtility.ConvertWindowsPath(Path.Combine(Path.GetDirectoryName(fastqPaths[0]), $"{Path.GetFileNameWithoutExtension(fastqPaths[0])}Hisat2Out.sam"));
+            logOutput = WrapperUtility.ConvertWindowsPath(Path.Combine(Path.GetDirectoryName(fastqPaths[0]), $"{Path.GetFileNameWithoutExtension(fastqPaths[0])}Hisat2Out.log"));
 
-                }).WaitForExit();
-            }
-            else
+            WrapperUtility.GenerateAndRunScript(WrapperUtility.GetAnalysisScriptPath(analysisDirectory, "Hisat2Align.bash"), new List<string>
             {
-                outputDirectory = "Hisat2OutPaired.sam";
-                WrapperUtility.GenerateAndRunScript(WrapperUtility.GetAnalysisScriptPath(analysisDirectory, "Hisat2Align.bash"), new List<string>
-                {
                 WrapperUtility.ChangeToToolsDirectoryCommand(spritzDirectory),
-                "hisat2-2.1.0/hisat2 -q -x" +
-                " " + WrapperUtility.ConvertWindowsPath(IndexPrefix) +
-                " -1 " + string.Join(",", WrapperUtility.ConvertWindowsPath(fastqPaths[0])) +
-                " -2 " + string.Join(",", WrapperUtility.ConvertWindowsPath(fastqPaths[1])) +
-                " -S " + outputDirectory,
-
-                }).WaitForExit();
-            }
-            
+                $"hisat2-2.1.0/hisat2 {readsArgument} -p {threads.ToString()} -x {WrapperUtility.ConvertWindowsPath(indexPrefix)} -S {alignedBamOutput} &> {logOutput}"
+            }).WaitForExit();
         }
-        #endregion Alignment Methods
     }
 }

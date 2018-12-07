@@ -682,14 +682,14 @@ namespace Test
                 TestContext.CurrentContext.TestDirectory,
                 Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData"),
                 Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "chr1_sample.fa"),
-                out string IndexPrefix);
+                out string indexPrefix);
             string genomeFasta = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "chr1_sample.fa");
             Assert.IsTrue(HISAT2Wrapper.IndexExists(genomeFasta));
 
             HISAT2Wrapper.Align(
                 TestContext.CurrentContext.TestDirectory,
                 Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData"),
-                IndexPrefix,
+                indexPrefix,
                 new string[]
                 {
                     Path.Combine(TestContext.CurrentContext.TestDirectory,"TestFastqs", "mapper0.fastq"),
@@ -702,7 +702,7 @@ namespace Test
             HISAT2Wrapper.Align(
                 TestContext.CurrentContext.TestDirectory,
                 Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData"),
-                IndexPrefix,
+                indexPrefix,
                 new string[]
                 {
                     Path.Combine(TestContext.CurrentContext.TestDirectory,"TestFastqs", "mapper0.fastq"),
