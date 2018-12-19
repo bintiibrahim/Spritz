@@ -37,23 +37,44 @@ namespace WorkflowLayer
         /// </summary>
         public void PerformAlignment()
         {
+            double computerRAM =1 /*get this from the GATK section*/;
             int starThreads = Math.Min(18, Parameters.Threads); // 18 max, otherwise it throws a segmentation fault in sorting the BAM files
             if (Parameters.ExperimentType == ExperimentType.RNASequencing)
             {
-                // Alignment preparation
-                WrapperUtility.GenerateAndRunScript(WrapperUtility.GetAnalysisScriptPath(Parameters.AnalysisDirectory, "GenomeGenerate.bash"),
-                    STARWrapper.GenerateGenomeIndex(
-                        Parameters.SpritzDirectory,
-                        Parameters.Threads,
-                        Parameters.GenomeStarIndexDirectory,
-                        new string[] { Parameters.ReorderedFastaPath },
-                        Parameters.GeneModelGtfOrGffPath,
-                        Parameters.Fastqs))
-                    .WaitForExit();
+                if (computerRAM > 64.0)// whatever the RAM cutoff for STAR is
+                {
+                    // Alignment preparation
+                    WrapperUtility.GenerateAndRunScript(WrapperUtility.GetAnalysisScriptPath(Parameters.AnalysisDirectory, "GenomeGenerate.bash"),
+                        STARWrapper.GenerateGenomeIndex(
+                            Parameters.SpritzDirectory,
+                            Parameters.Threads,
+                            Parameters.GenomeStarIndexDirectory,
+                            new string[] { Parameters.ReorderedFastaPath },
+                            Parameters.GeneModelGtfOrGffPath,
+                            Parameters.Fastqs))
+                        .WaitForExit();
 
-                // there's trouble with the number of open files for sorting and stuff, which increases with the number of threads
-                // 18 is the max that works with the default max number of open files
-                TwoPassAlignment(starThreads, Parameters.OverwriteStarAlignment);
+                    // there's trouble with the number of open files for sorting and stuff, which increases with the number of threads
+                    // 18 is the max that works with the default max number of open files
+                    TwoPassAlignment(starThreads, Parameters.OverwriteStarAlignment);
+                }
+                else
+                {
+                    //Hisat2
+                    HISAT2Wrapper.GenerateIndex(Parameters.SpritzDirectory, Parameters.AnalysisDirectory, Parameters.ReorderedFastaPath, out string indexPrefix); //makes index
+                    HISAT2Wrapper.GetSpliceSites(Parameters.SpritzDirectory, Parameters.AnalysisDirectory, Parameters.GeneModelGtfOrGffPath, out string spliceSitesPath); // gets splice sites from reference genome if GTF
+                    HISAT2Wrapper.Align(Parameters.SpritzDirectory, Parameters.AnalysisDirectory, spliceSitesPath, starThreads, indexPrefix, Parameters.Fastqs, out string alignedSamFile, out string logHisat2Output);// aligns to genome fasta using splice sites from above
+                    WrapperUtility.GenerateAndRunScript(WrapperUtility.GetAnalysisScriptPath(Parameters.AnalysisDirectory, "SamToBam.bash"), new List<string>// the ouput of HISAT is a Sam so need to convert to BAm
+                    {
+                        WrapperUtility.ChangeToToolsDirectoryCommand(Parameters.SpritzDirectory),
+                        $"samtools-1.8/samtools view -bS {WrapperUtility.ConvertWindowsPath(alignedSamFile)} > {WrapperUtility.ConvertWindowsPath(Path.Combine(Path.GetDirectoryName(alignedSamFile), $"{Path.GetFileNameWithoutExtension(alignedSamFile)}.bam"))}"
+                    }).WaitForExit();
+                    WrapperUtility.GenerateAndRunScript(WrapperUtility.GetAnalysisScriptPath(Parameters.AnalysisDirectory, "BamToSortedBam.bash"), new List<string>// convert Bam to sorted Bam format to move forward
+                    {
+                        WrapperUtility.ChangeToToolsDirectoryCommand(Parameters.SpritzDirectory),
+                        $"samtools-1.8/samtools sort {WrapperUtility.ConvertWindowsPath(Path.Combine(Path.GetDirectoryName(alignedSamFile), $"{Path.GetFileNameWithoutExtension(alignedSamFile)}.bam"))} -o {WrapperUtility.ConvertWindowsPath(Path.Combine(Path.GetDirectoryName(alignedSamFile), $"{Path.GetFileNameWithoutExtension(alignedSamFile)}.sorted.bam"))}"
+                    }).WaitForExit();                    
+                }
             }
             else
             {

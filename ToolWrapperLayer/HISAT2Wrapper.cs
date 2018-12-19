@@ -58,19 +58,28 @@ namespace ToolWrapperLayer
                 $"hisat2-2.1.0/hisat2-build {WrapperUtility.ConvertWindowsPath(genomeFasta)} {WrapperUtility.ConvertWindowsPath(indexPrefix)}"
             }).WaitForExit();
         }
-
-        public static void Align(string spritzDirectory, string analysisDirectory, int threads, string indexPrefix, string[] fastqPaths, out string alignedBamOutput, out string logOutput)
+        public static void GetSpliceSites(string spritzDirectory, string analysisDirectory, string referenceGtf, out string spliceSites)
+        {
+            spliceSites = WrapperUtility.ConvertWindowsPath(Path.Combine(Path.GetDirectoryName(referenceGtf), $"{Path.GetFileNameWithoutExtension(referenceGtf)}SpliceSites.splices"));
+            WrapperUtility.GenerateAndRunScript(WrapperUtility.GetAnalysisScriptPath(analysisDirectory, "Hisat2ExtractSpliceSites.bash"), new List<string>
+            {
+                WrapperUtility.ChangeToToolsDirectoryCommand(spritzDirectory),
+                $"hisat2-2.1.0/hisat2_extract_splice_sites.py {WrapperUtility.ConvertWindowsPath(referenceGtf)} > {WrapperUtility.ConvertWindowsPath(spliceSites)}"
+            }).WaitForExit();
+        }
+        public static void Align(string spritzDirectory, string analysisDirectory, string spliceSites, int threads, string indexPrefix, string[] fastqPaths, out string alignedBamOutput, out string logOutput)
         {
             string readsArgument = fastqPaths.Length == 1 ?
                 $" -U {WrapperUtility.ConvertWindowsPath(fastqPaths[0])}" :
                 $" -1 {string.Join(",", WrapperUtility.ConvertWindowsPath(fastqPaths[0]))} -2 {string.Join(",", WrapperUtility.ConvertWindowsPath(fastqPaths[1]))}";
+            string splice = $"--known-splicesite-infile {WrapperUtility.ConvertWindowsPath(spliceSites)}";
             alignedBamOutput = WrapperUtility.ConvertWindowsPath(Path.Combine(Path.GetDirectoryName(fastqPaths[0]), $"{Path.GetFileNameWithoutExtension(fastqPaths[0])}Hisat2Out.sam"));
             logOutput = WrapperUtility.ConvertWindowsPath(Path.Combine(Path.GetDirectoryName(fastqPaths[0]), $"{Path.GetFileNameWithoutExtension(fastqPaths[0])}Hisat2Out.log"));
 
             WrapperUtility.GenerateAndRunScript(WrapperUtility.GetAnalysisScriptPath(analysisDirectory, "Hisat2Align.bash"), new List<string>
             {
                 WrapperUtility.ChangeToToolsDirectoryCommand(spritzDirectory),
-                $"hisat2-2.1.0/hisat2 {readsArgument} -p {threads.ToString()} -x {WrapperUtility.ConvertWindowsPath(indexPrefix)} -S {alignedBamOutput} &> {logOutput}"
+                $"hisat2-2.1.0/hisat2 {spliceSites} {readsArgument}  -p {threads.ToString()} -q -x {WrapperUtility.ConvertWindowsPath(indexPrefix)} -S {alignedBamOutput} &> {logOutput}"
             }).WaitForExit();
         }
     }
