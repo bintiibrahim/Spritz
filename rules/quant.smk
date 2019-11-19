@@ -39,7 +39,7 @@ rule rsem_star_align:
 rule make_rsem_dataframe:
     '''Take the results from RSEM and put them in a usable dataframe'''
     input:
-        expand("{dir}/{sra}.genes.results", sra=config["sra"]),
+        expand("{dir}/{sra}.genes.results", sra=config["sra"], dir=config["analysisDirectory"]),
         gff="data/ensembl/" + REF + "." + config["release"] + ".gff3" + ".fix.gff3"
     output:
         counts="{dir}/Counts.csv",
