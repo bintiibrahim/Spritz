@@ -1,11 +1,9 @@
-﻿using CMD;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Windows;
-using ToolWrapperLayer;
-using WorkflowLayer;
 using PerformanceCounter = System.Diagnostics.PerformanceCounter;
 
 namespace SpritzGUI
@@ -30,6 +28,7 @@ namespace SpritzGUI
             UpdateFieldsFromTask(Options);
             SettingUp = false;
             ChooseWorkerPreset();
+            DataContext = this;
         }
 
         public WorkFlowWindow(Options options)
@@ -41,6 +40,7 @@ namespace SpritzGUI
             Options = options;
             SettingUp = false;
             ChooseWorkerPreset();
+            DataContext = this;
         }
 
         public Options Options { get; set; } = new Options();
@@ -53,74 +53,74 @@ namespace SpritzGUI
         }
 
         protected void SaveButton_Click(object sender, RoutedEventArgs e)
-        {           
-            // Command selection
-            int i = CbxWorkFlowType.SelectedIndex;
-            if (i == 0)
-            {
-                Options.Command = SampleSpecificProteinDBFlow.Command;
-            }
-            else if (i == 1)
-            {
-                Options.Command = LncRNADiscoveryFlow.Command;
-            }
-            else if (i == 2)
-            {
-                Options.Command = TranscriptQuantificationFlow.Command;
-            }
-            else if (i == 3)
-            {
-                Options.Command = AlignmentFlow.Command;
-            }
-            else if (i == 4)
-            {
-                Options.Command = GeneFusionDiscoveryFlow.Command;
-            }
-            else
-            {
-                MessageBox.Show("Please choose a workflow.");
-                return;
-            }
+        {
+            //// Command selection
+            //int i = CbxWorkFlowType.SelectedIndex;
+            //if (i == 0)
+            //{
+            //    Options.Command = SampleSpecificProteinDBFlow.Command;
+            //}
+            //else if (i == 1)
+            //{
+            //    Options.Command = LncRNADiscoveryFlow.Command;
+            //}
+            //else if (i == 2)
+            //{
+            //    Options.Command = TranscriptQuantificationFlow.Command;
+            //}
+            //else if (i == 3)
+            //{
+            //    Options.Command = AlignmentFlow.Command;
+            //}
+            //else if (i == 4)
+            //{
+            //    Options.Command = GeneFusionDiscoveryFlow.Command;
+            //}
+            //else
+            //{
+            //    MessageBox.Show("Please choose a workflow.");
+            //    return;
+            //}
 
-            // Indel finder selection
-            int ii = CmbxIndelFinding.SelectedIndex;
-            if (ii == 0)
-            {
-                Options.IndelFinder = "none";
-            }
-            else if (ii == 1)
-            {
-                Options.IndelFinder = "gatk";
-            }
-            else if (ii == 2)
-            {
-                Options.IndelFinder = "scalpel";
-            }
-            else
-            {
-                MessageBox.Show("Please choose an indel finding selection.");
-                return;
-            }
+            //// Indel finder selection
+            //int ii = CmbxIndelFinding.SelectedIndex;
+            //if (ii == 0)
+            //{
+            //    Options.IndelFinder = "none";
+            //}
+            //else if (ii == 1)
+            //{
+            //    Options.IndelFinder = "gatk";
+            //}
+            //else if (ii == 2)
+            //{
+            //    Options.IndelFinder = "scalpel";
+            //}
+            //else
+            //{
+            //    MessageBox.Show("Please choose an indel finding selection.");
+            //    return;
+            //}
 
-            // Experiment type selection
-            int iii = CmbxExperimentType.SelectedIndex;
-            if (iii == 0)
-            {
-                Options.ExperimentType = ExperimentType.RNASequencing.ToString();
-            }
-            else if (iii == 1)
-            {
-                Options.ExperimentType = ExperimentType.WholeGenomeSequencing.ToString();
-            }
-            else if (iii == 2)
-            {
-                Options.ExperimentType = ExperimentType.ExomeSequencing.ToString();
-            }
-            else
-            {
-                MessageBox.Show("Please choose an experiment type selection.");
-                return;
-            }
+            //// Experiment type selection
+            //int iii = CmbxExperimentType.SelectedIndex;
+            //if (iii == 0)
+            //{
+            //    Options.ExperimentType = ExperimentType.RNASequencing.ToString();
+            //}
+            //else if (iii == 1)
+            //{
+            //    Options.ExperimentType = ExperimentType.WholeGenomeSequencing.ToString();
+            //}
+            //else if (iii == 2)
+            //{
+            //    Options.ExperimentType = ExperimentType.ExomeSequencing.ToString();
+            //}
+            //else
+            //{
+            //    MessageBox.Show("Please choose an experiment type selection.");
+            //    return;
+            //}
 
             // Options.SpritzDirectory = txtSpritzDirecory.Text;
             var defaultAnalysisDirectory = Path.Combine(Directory.GetCurrentDirectory(), "output");
@@ -133,12 +133,17 @@ namespace SpritzGUI
 
             if (!Directory.Exists(Options.AnalysisDirectory))
             {
-
                 MessageBox.Show("Analysis directory does not exist.", "Workflow", MessageBoxButton.OK);
                 return;
             }
 
             Options.Threads = int.Parse(txtThreads.Text);
+            Ensembl ensembl = (Ensembl)EnsemblReleaseVersions.SelectedItem;
+            Options.Release = ensembl.Release;
+            Options.Species = EnsemblSpecies.SelectedItem.ToString();
+            Options.Reference = ensembl.Genomes[Options.Species];
+            Options.Organism = ensembl.Organisms[Options.Species];
+            Options.SnpEff = "86";
 
             // features yet to be supported
             //Options.GenomeStarIndexDirectory = txtGenomeDir.Text;
@@ -219,43 +224,43 @@ namespace SpritzGUI
                 }
             }
 
-            Options.ExperimentType = CmbxExperimentType.SelectedItem.ToString();
+            //Options.ExperimentType = CmbxExperimentType.SelectedItem.ToString();
             var sraCollection = (ObservableCollection<SRADataGrid>)MainWindow.LbxSRAs.ItemsSource;
             Options.SraAccession = string.Join(",", sraCollection.Select(p => p.Name).ToArray());
 
-            // add the commands
-            foreach (var aWorkFlow in Enum.GetValues(typeof(MyWorkflow)))
-            {
-                if (options.Command == SampleSpecificProteinDBFlow.Command)
-                {
-                    CbxWorkFlowType.SelectedIndex = 0;
-                }
-                else if (options.Command == LncRNADiscoveryFlow.Command)
-                {
-                    CbxWorkFlowType.SelectedIndex = 1;
-                }
-                else if (options.Command == TranscriptQuantificationFlow.Command)
-                {
-                    CbxWorkFlowType.SelectedIndex = 2;
-                }
-                else if (options.Command == AlignmentFlow.Command)
-                {
-                    CbxWorkFlowType.SelectedIndex = 3;
-                }
-                else if (options.Command == GeneFusionDiscoveryFlow.Command)
-                {
-                    CbxWorkFlowType.SelectedIndex = 4;
-                }
-                else
-                {
-                    // do nothing
-                }
-            }
+            //// add the commands
+            //foreach (var aWorkFlow in Enum.GetValues(typeof(MyWorkflow)))
+            //{
+            //    if (options.Command == SampleSpecificProteinDBFlow.Command)
+            //    {
+            //        CbxWorkFlowType.SelectedIndex = 0;
+            //    }
+            //    else if (options.Command == LncRNADiscoveryFlow.Command)
+            //    {
+            //        CbxWorkFlowType.SelectedIndex = 1;
+            //    }
+            //    else if (options.Command == TranscriptQuantificationFlow.Command)
+            //    {
+            //        CbxWorkFlowType.SelectedIndex = 2;
+            //    }
+            //    else if (options.Command == AlignmentFlow.Command)
+            //    {
+            //        CbxWorkFlowType.SelectedIndex = 3;
+            //    }
+            //    else if (options.Command == GeneFusionDiscoveryFlow.Command)
+            //    {
+            //        CbxWorkFlowType.SelectedIndex = 4;
+            //    }
+            //    else
+            //    {
+            //        // do nothing
+            //    }
+            //}
 
             txtAnalysisDirectory.Text = AnalysisDirectory;
             txtThreads.Text = options.Threads.ToString();
-            txtEnsemblReference.Text = options.Reference ?? "GRCh38";
             TxtVariantCallingWorkerNum.Text = options.VariantCallingWorkers.ToString();
+            saveButton.IsEnabled = false;
 
             //txtSpritzDirecory.Text = options.SpritzDirectory;
             //txtGenomeDir.Text = TrimQuotesOrNull(options.GenomeStarIndexDirectory);
@@ -270,7 +275,7 @@ namespace SpritzGUI
             //txtProteinFasta.Text = options.ProteinFastaPath;
             //UpdateReference();
         }
-        
+
         private string TrimQuotesOrNull(string a)
         {
             return a == null ? a : a.Trim('"');
@@ -278,24 +283,66 @@ namespace SpritzGUI
 
         private void PopulateChoices()
         {
-            foreach (string aWorkFlow in Enum.GetNames(typeof(MyWorkflow)))
-            {
-                CbxWorkFlowType.Items.Add(aWorkFlow);
-            }
-            if (Options.Fastq1 == null)
-            {
-                Options.Command = SampleSpecificProteinDBFlow.Command; // this is the only one currently allowed without FASTQ files
-            }
+            //foreach (string aWorkFlow in Enum.GetNames(typeof(MyWorkflow)))
+            //{
+            //    CbxWorkFlowType.Items.Add(aWorkFlow);
+            //}
+            //if (Options.Fastq1 == null)
+            //{
+            //    //Options.Command = SampleSpecificProteinDBFlow.Command; // this is the only one currently allowed without FASTQ files
+            //}
 
             CmbxIndelFinding.Items.Add("None");
             CmbxIndelFinding.Items.Add("GATK");
             CmbxIndelFinding.Items.Add("Scalpel");
             CmbxIndelFinding.SelectedIndex = 1; // hard coded selection (for now)
 
-            CmbxExperimentType.Items.Add(ExperimentType.RNASequencing.ToString());
-            CmbxExperimentType.Items.Add(ExperimentType.WholeGenomeSequencing.ToString());
-            CmbxExperimentType.Items.Add(ExperimentType.ExomeSequencing.ToString());
-            CmbxExperimentType.SelectedIndex = 0; // hard coded selection (for now)
+            //CmbxExperimentType.Items.Add(ExperimentType.RNASequencing.ToString());
+            //CmbxExperimentType.Items.Add(ExperimentType.WholeGenomeSequencing.ToString());
+            //CmbxExperimentType.Items.Add(ExperimentType.ExomeSequencing.ToString());
+            //CmbxExperimentType.SelectedIndex = 0; // hard coded selection (for now)
+
+            EnsemblReleases = new ObservableCollection<Ensembl>();
+
+            // read release.txt files into a list
+            string releasefolder = Path.Combine(Directory.GetCurrentDirectory(), "EnsemblReleases");
+            var releases = Directory.GetFiles(releasefolder, "*.txt").Select(Path.GetFileNameWithoutExtension).ToList();
+
+            var genomeDB = File.ReadAllLines(Path.Combine(Directory.GetCurrentDirectory(), "genomes.csv"));
+            foreach (string release in releases)
+            {
+                // read txt file into obsv collection
+                var file = File.ReadAllLines(Path.Combine(releasefolder, $"{release}.txt"));
+                var species = new List<string>(file);
+                Dictionary<string, string> genomes = new Dictionary<string, string>();
+                Dictionary<string, string> organisms = new Dictionary<string, string>();
+
+                var unsupported = new List<string>();
+                foreach (string genome in genomeDB.Where(g => g.Contains(release)))
+                {
+                    var splt = genome.Split(',');
+                    genomes.Add(splt[1], splt[3]); // <Species, GenomeVer>
+                    organisms.Add(splt[1], splt[2]); // <Species, OrganismName>
+
+                    if (!string.Equals(splt[4], "86")) // only add species supported in snpeff (ver 86 ensembl)
+                    {
+                        unsupported.Add(splt[1]);
+                    }
+                }
+
+                var supported = species.Where(s => !unsupported.Contains(s)).ToList();
+                EnsemblReleases.Add(new Ensembl() { Release = release, Species = new ObservableCollection<string>(supported), Genomes = genomes, Organisms = organisms });
+            }
+        }
+
+        public ObservableCollection<Ensembl> EnsemblReleases { get; set; }
+
+        public class Ensembl
+        {
+            public string Release { get; set; }
+            public ObservableCollection<string> Species { get; set; }
+            public Dictionary<string, string> Genomes { get; set; } // Mus_musculus GRCm38
+            public Dictionary<string, string> Organisms { get; set; } // Mus_musculus GRCm38
         }
 
         //private void txtStarFusionReference_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
@@ -387,47 +434,47 @@ namespace SpritzGUI
             TxtVariantCallingWorkerNum.Text = workers.ToString();
         }
 
-        private void CheckMemory()
-        {
-            if (SettingUp)
-            {
-                return;
-            }
+        //private void CheckMemory()
+        //{
+        //    if (SettingUp)
+        //    {
+        //        return;
+        //    }
 
-            bool validThreads = int.TryParse(txtThreads.Text, out int threads);
-            bool validVariantCallers = int.TryParse(TxtVariantCallingWorkerNum.Text, out int variantCallingWorkers);
-            if (validThreads
-                && validVariantCallers
-                && variantCallingWorkers > 0
-                && variantCallingWorkers <= Math.Ceiling((double)threads / (double)2))
-            {
-                Options.VariantCallingWorkers = variantCallingWorkers;
-            }
+        //    bool validThreads = int.TryParse(txtThreads.Text, out int threads);
+        //    bool validVariantCallers = int.TryParse(TxtVariantCallingWorkerNum.Text, out int variantCallingWorkers);
+        //    if (validThreads
+        //        && validVariantCallers
+        //        && variantCallingWorkers > 0
+        //        && variantCallingWorkers <= Math.Ceiling((double)threads / (double)2))
+        //    {
+        //        Options.VariantCallingWorkers = variantCallingWorkers;
+        //    }
 
-            string indelFinder = CmbxIndelFinding.Items[CmbxIndelFinding.SelectedIndex].ToString(); // get new selected index (.Text gives old result)
-            int recommendation = "scalpel".Equals(indelFinder, StringComparison.InvariantCultureIgnoreCase) ? ScalpelMemoryReccommendation : GatkMemoryReccommendation;
-            if (Options.Command == SampleSpecificProteinDBFlow.Command
-                && AvailableMemoryMb / Options.VariantCallingWorkers < recommendation)
-            {
-                MessageBox.Show($"Using {Options.VariantCallingWorkers.ToString()} workers with {AvailableMemoryMb.ToString()} MB of memory " +
-                    $"leaves less than the {recommendation} MB memory per worker recommended for variant calling.",
-                    "Workflow", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
+        //    string indelFinder = CmbxIndelFinding.Items[CmbxIndelFinding.SelectedIndex].ToString(); // get new selected index (.Text gives old result)
+        //    int recommendation = "scalpel".Equals(indelFinder, StringComparison.InvariantCultureIgnoreCase) ? ScalpelMemoryReccommendation : GatkMemoryReccommendation;
+        //    if (Options.Command == SampleSpecificProteinDBFlow.Command
+        //        && AvailableMemoryMb / Options.VariantCallingWorkers < recommendation)
+        //    {
+        //        MessageBox.Show($"Using {Options.VariantCallingWorkers.ToString()} workers with {AvailableMemoryMb.ToString()} MB of memory " +
+        //            $"leaves less than the {recommendation} MB memory per worker recommended for variant calling.",
+        //            "Workflow", MessageBoxButton.OK, MessageBoxImage.Information);
+        //    }
 
-            if (variantCallingWorkers > threads)
-            {
-                MessageBox.Show($"Using {Options.VariantCallingWorkers.ToString()} workers with {threads.ToString()} threads " +
-                    $"leaves less than the {2} threads per worker recommended for variant calling.",
-                    "Workflow", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
+        //    if (variantCallingWorkers > threads)
+        //    {
+        //        MessageBox.Show($"Using {Options.VariantCallingWorkers.ToString()} workers with {threads.ToString()} threads " +
+        //            $"leaves less than the {2} threads per worker recommended for variant calling.",
+        //            "Workflow", MessageBoxButton.OK, MessageBoxImage.Information);
+        //    }
 
-            if (validThreads
-                && validVariantCallers
-                && variantCallingWorkers <= 0)
-            {
-                TxtVariantCallingWorkerNum.Text = (++variantCallingWorkers).ToString(); 
-            }
-        }
+        //    if (validThreads
+        //        && validVariantCallers
+        //        && variantCallingWorkers <= 0)
+        //    {
+        //        TxtVariantCallingWorkerNum.Text = (++variantCallingWorkers).ToString();
+        //    }
+        //}
 
         private void CmdUpVariantCallingWorkers_Click(object sender, RoutedEventArgs e)
         {
@@ -441,7 +488,7 @@ namespace SpritzGUI
 
         private void TxtVariantCallingWorkerNum_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
-            CheckMemory();
+            //CheckMemory();
         }
 
         private void CmbxIndelFinding_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -452,6 +499,18 @@ namespace SpritzGUI
         private void txtThreads_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
             ChooseWorkerPreset();
+        }
+
+        public string Reference { get; set; } // define notify property changed
+
+        private void Species_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            saveButton.IsEnabled = true;
+
+            // get selection from species
+            var selectedEnsembl = (Ensembl)EnsemblReleaseVersions.SelectedItem;
+            var selectedSpecies = (string)EnsemblSpecies.SelectedItem;
+            Reference = selectedEnsembl.Genomes[selectedSpecies];
         }
     }
 }

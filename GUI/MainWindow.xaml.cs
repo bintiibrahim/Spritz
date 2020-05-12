@@ -1,7 +1,6 @@
-﻿using CMD;
-using Nett;
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -9,8 +8,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using WorkflowLayer;
-using System.Diagnostics;
 
 namespace SpritzGUI
 {
@@ -30,11 +27,10 @@ namespace SpritzGUI
         public MainWindow()
         {
             InitializeComponent();
-
             DataGridRnaSeqFastq.DataContext = RnaSeqFastqCollection;
             workflowTreeView.DataContext = StaticTasksObservableCollection;
             LbxSRAs.ItemsSource = SraCollection;
-            MessageBox.Show("Please have Docker Desktop installed. Under \"Shared Drives\", select drives to be shared and click \"Apply\".", "Setup", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Please have Docker Desktop installed. Under \"Shared Drives\", you must select the C drive and any desired drive to save your Spritz analysis, then click \"Apply\". Please also allocate sufficient memory for Spritz under \"Advanced\".", "Setup", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         protected override void OnClosed(EventArgs e)
@@ -54,7 +50,7 @@ namespace SpritzGUI
             {
                 proc.WaitForExit();
             }
-            
+
             base.OnClosed(e);
         }
 
@@ -129,18 +125,24 @@ namespace SpritzGUI
                 }
 
                 DynamicTasksObservableCollection = new ObservableCollection<InRunTask>();
-                for (int i = 0; i < StaticTasksObservableCollection.Count; i++)
-                {
-                    DynamicTasksObservableCollection.Add(new InRunTask("Workflow" + (i + 1) + "-" + StaticTasksObservableCollection[i].options.Command.ToString(), StaticTasksObservableCollection[i].options));
-                }
+                DynamicTasksObservableCollection.Add(new InRunTask("Workflow 1", StaticTasksObservableCollection.First().options));
                 workflowTreeView.DataContext = DynamicTasksObservableCollection;
-                Everything = new EverythingRunnerEngine(DynamicTasksObservableCollection.Select(b => new Tuple<string, Options>(b.DisplayName, b.options)).ToList(), OutputFolderTextBox.Text);
-                //WarningsTextBox.AppendText(string.Join("\n", Everything.GenerateCommandsDry().Select(x => $"Command executing: CMD.exe {x}"))); // keep for debugging
+                
+                Everything = new EverythingRunnerEngine(DynamicTasksObservableCollection.Select(b => new Tuple<string, Options>(b.DisplayName, b.options)).First(), OutputFolderTextBox.Text);
+                Everything.SetUpDirectories();
+
+                WarningsTextBox.Document.Blocks.Clear();
                 WarningsTextBox.AppendText(string.Join("\n", Everything.GenerateCommandsDry().Select(x => $"Command executing: Powershell.exe {x}"))); // keep for debugging
+                
                 var t = new Task(Everything.Run);
                 t.Start();
                 t.ContinueWith(DisplayAnyErrors);
+
+                // update gui
                 RunWorkflowButton.IsEnabled = false;
+                ClearTasksButton.IsEnabled = true;
+                BtnWorkFlow.IsEnabled = false;
+                ResetTasksButton.IsEnabled = true;
             }
             catch (TaskCanceledException)
             {
@@ -175,8 +177,10 @@ namespace SpritzGUI
             }
             else
             {
-                Dispatcher.Invoke(() => WarningsTextBox.AppendText("Done!" + Environment.NewLine));
-                Dispatcher.Invoke(() => MessageBox.Show("Finished!", "Spritz Workflow", MessageBoxButton.OK, MessageBoxImage.Information));
+                Dispatcher.Invoke(() => WarningsTextBox.AppendText(": Done!" + Environment.NewLine));
+                Dispatcher.Invoke(() => MessageBox.Show("Finished! Workflow summary is located in " 
+                    + StaticTasksObservableCollection.First().options.AnalysisDirectory, "Spritz Workflow", 
+                    MessageBoxButton.OK, MessageBoxImage.Information));
             }
         }
 
@@ -229,70 +233,52 @@ namespace SpritzGUI
         private void ClearTasksButton_Click(object sender, RoutedEventArgs e)
         {
             StaticTasksObservableCollection.Clear();
+            workflowTreeView.DataContext = StaticTasksObservableCollection;
+            WarningsTextBox.Document.Blocks.Clear();
             UpdateTaskGuiStuff();
         }
-
-        //private void RemoveLastTaskButton_Click(object sender, RoutedEventArgs e)
-        //{
-        //    StaticTasksObservableCollection.RemoveAt(StaticTasksObservableCollection.Count - 1);
-        //    UpdateTaskGuiStuff();
-        //}
 
         private void ResetTasksButton_Click(object sender, RoutedEventArgs e)
         {
             RunWorkflowButton.IsEnabled = true;
+            ClearTasksButton.IsEnabled = true;
+            BtnWorkFlow.IsEnabled = false;
             ResetTasksButton.IsEnabled = false;
-            for (int i = 0; i < DynamicTasksObservableCollection.Count; i++)
-            {
-                StaticTasksObservableCollection.Add(new PreRunTask(StaticTasksObservableCollection[i].options));
-            }
+
             DynamicTasksObservableCollection.Clear();
             workflowTreeView.DataContext = StaticTasksObservableCollection;
         }
 
-        private void AddNewRnaSeqFastq(object sender, StringListEventArgs e)
-        {
-            if (!Dispatcher.CheckAccess())
-            {
-                Dispatcher.BeginInvoke(new Action(() => AddNewRnaSeqFastq(sender, e)));
-            }
-            else
-            {
-                foreach (var uu in RnaSeqFastqCollection)
-                {
-                    uu.Use = false;
-                }
-                foreach (var newRnaSeqFastqData in e.StringList)
-                {
-                    RnaSeqFastqCollection.Add(new RNASeqFastqDataGrid(newRnaSeqFastqData));
-                }
-                UpdateOutputFolderTextbox();
-            }
-        }
-
-        private void MenuItem_Setup_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var dialog = new InstallWindow();
-                dialog.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.ToString(), "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
+        //private void AddNewRnaSeqFastq(object sender, StringListEventArgs e)
+        //{
+        //    if (!Dispatcher.CheckAccess())
+        //    {
+        //        Dispatcher.BeginInvoke(new Action(() => AddNewRnaSeqFastq(sender, e)));
+        //    }
+        //    else
+        //    {
+        //        foreach (var uu in RnaSeqFastqCollection)
+        //        {
+        //            uu.Use = false;
+        //        }
+        //        foreach (var newRnaSeqFastqData in e.StringList)
+        //        {
+        //            RnaSeqFastqCollection.Add(new RNASeqFastqDataGrid(newRnaSeqFastqData));
+        //        }
+        //        UpdateOutputFolderTextbox();
+        //    }
+        //}
 
         private void BtnAddSRA_Click(object sender, RoutedEventArgs e)
         {
             if (TbxSRA.Text.Contains("SR") || TbxSRA.Text.Contains("ER"))
             {
-                if (SraCollection.Any(s => s.Name == TbxSRA.Text))
+                if (SraCollection.Any(s => s.Name == TbxSRA.Text.Trim()))
                 {
                     MessageBox.Show("That SRA has already been added. Please choose a new SRA accession.", "Workflow", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
-                { 
+                {
                     SRADataGrid sraDataGrid = new SRADataGrid(TbxSRA.Text.Trim());
                     SraCollection.Add(sraDataGrid);
                 }
@@ -328,7 +314,8 @@ namespace SpritzGUI
                     UpdateTaskGuiStuff();
                     UpdateOutputFolderTextbox();
                 }
-            } catch (InvalidOperationException)
+            }
+            catch (InvalidOperationException)
             {
                 // does not open workflow window until all fastq files are added, if any
             }
@@ -354,12 +341,14 @@ namespace SpritzGUI
                 RunWorkflowButton.IsEnabled = false;
                 ClearTasksButton.IsEnabled = false;
                 BtnWorkFlow.IsEnabled = true;
+                ResetTasksButton.IsEnabled = false;
             }
             else
             {
                 RunWorkflowButton.IsEnabled = true;
                 ClearTasksButton.IsEnabled = true;
                 BtnWorkFlow.IsEnabled = false;
+                ResetTasksButton.IsEnabled = false;
             }
         }
 
@@ -387,7 +376,6 @@ namespace SpritzGUI
         //    var newPath = string.Join("\\", filePath.Take(filePath.Length - 1));
         //    return newPath;
         //}
-
 
         //private void UpdateOutputFolderTextbox(string filePath = null)
         //{
@@ -448,21 +436,22 @@ namespace SpritzGUI
                             return;
                         }
 
-                    //case ".toml":
-                    //    TomlTable tomlFile = null;
-                    //    try
-                    //    {
-                    //        tomlFile = Toml.ReadFile(filepath);
-                    //    }
-                    //    catch (Exception)
-                    //    {
-                    //        break;
-                    //    }
-                    //    var ye1 = Toml.ReadFile<Options>(filepath);
-                    //    AddTaskToCollection(ye1);
-                    //    break;
+                        //case ".toml":
+                        //    TomlTable tomlFile = null;
+                        //    try
+                        //    {
+                        //        tomlFile = Toml.ReadFile(filepath);
+                        //    }
+                        //    catch (Exception)
+                        //    {
+                        //        break;
+                        //    }
+                        //    var ye1 = Toml.ReadFile<Options>(filepath);
+                        //    AddTaskToCollection(ye1);
+                        //    break;
                 }
-            } else
+            }
+            else
             {
                 MessageBox.Show("User already added SRA number. Please only choose one input: 1) SRA accession 2) FASTQ files.", "Run Workflows", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;

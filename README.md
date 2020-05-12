@@ -7,10 +7,22 @@ Spritz uses the Windows Subsystem for Linux (WSL) to install and run commandline
 
 Spritz can be downloaded [here](https://github.com/smith-chem-wisc/Spritz/releases).
 
-## Setting Up WSL
-1. Install [Ubuntu from the Microsoft Store](https://www.microsoft.com/store/productId/9NBLGGH4MSV6).
-2. Open the "Turn Windows features on or off" application.
-![image](https://user-images.githubusercontent.com/16342951/45467794-0907b200-b6e7-11e8-97db-1271d09544e8.png)
-3. Turn on the "Windows Subsystem for Linux"
-![wsl](https://user-images.githubusercontent.com/16342951/45467902-9945f700-b6e7-11e8-90f1-8ebdc065aedb.png)
-4. Restart your computer and fire up Ubuntu
+## Running Spritz with GUI
+
+1. Install [Docker Desktop for Windows](https://hub.docker.com/editions/community/docker-ce-desktop-windows).
+
+2. Under Docker Settings, enable C and other necessary drives and allocate sufficient resources (recommended 16GB).
+
+    ![settings](https://user-images.githubusercontent.com/42819128/70090841-8a937a80-15e0-11ea-9742-ca959a89deca.png)
+
+3. Launch Spritz.
+
+    ![howto](https://user-images.githubusercontent.com/42819128/70091146-2624eb00-15e1-11ea-9230-bfd118aa03d9.png)
+
+    Step 1: Input SRA accessions OR FASTQ files.
+
+    Step 2: Create and customize your Spritz workflow.
+    
+   ![workflow](https://user-images.githubusercontent.com/42819128/70091992-e65f0300-15e2-11ea-9e0f-7bb4262afefa.png)
+   
+    Step 3: Run Spritz!
